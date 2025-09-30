@@ -4,7 +4,7 @@
 
 Pandas as a Service (PaaS) transforms messy Python scripts into **clean, declarative specs** you can generate with AI, edit visually, and execute anywhere.
 
-It’s not a library. It’s not a framework.  
+It’s not a library. It’s not a framework.
 It’s a **post-code execution model** for business logic — built for the AI era.
 
 ---
@@ -19,7 +19,7 @@ processor:
     - select: "row.region === 'US'"
     - derive:
         revenue: "row.units * row.price"
-````
+```
 
 **This is Pandas — without code.**
 The same logic. But:
@@ -31,7 +31,43 @@ The same logic. But:
 
 ---
 
-## 🎯 Who It’s For
+## 🌟 What’s Inside
+
+### ✨ SPC (Single Page Computer)
+
+* The atomic unit of portable logic
+* Describes your pipeline in JSON or YAML
+* Works entirely client-side (browser or offline)
+
+### 🏋️ EDT Micro-Kernel Engine (KERN)
+
+* Tick-based execution loop
+* Lifecycle manager auto-resets services
+* Built-in observability and hash-chained audit logs (MNEME)
+
+### 💡 Declarative Primitives
+
+* **connector** - fetch data
+* **processor** - filter, map, transform
+* **adapter** - trigger webhooks / side effects
+* **monitor** - fire alerts
+* **iterator** - walk over arrays
+* **router** - conditional logic
+* **vault** - manage secrets
+
+### 🔗 Execution = Deterministic
+
+Every tick:
+
+1. Scans for `status: running`
+2. Executes handlers
+3. Applies lifecycle policies
+4. Updates shared state
+5. Appends to audit ledger
+
+---
+
+## 🌊 Who It’s For
 
 | Persona            | Before                           | After                                       |
 | ------------------ | -------------------------------- | ------------------------------------------- |
@@ -41,73 +77,17 @@ The same logic. But:
 
 ---
 
-## 📦 The Stack
-
-### ✅ **Specs**
-
-SPC (`*.spc.json`) is the declarative format for describing data pipelines:
-
-* Connectors
-* Processors
-* Aggregators
-* Adapters
-* Vault secrets
-* Monitors
-
-### ⚙️ **Runtime**
-
-A 50-line **deterministic micro-kernel** executes SPC specs:
-
-* Ticks through service blocks
-* Supports plug-and-play handlers
-* Runs in browser, Node, or server
-
-### 🧠 **Studio**
-
-A Figma-like canvas to:
-
-* Drag + drop primitives
-* View live data flow connections
-* Edit specs in real-time
-* Import/export `.spc.json`
-
----
-
-## 💰 Why It Matters
-
-### Traditional Data Pipeline:
+## 📦 Folder Structure
 
 ```
-Business logic → Engineers → Python code → Pipelines → Output
-                 ↑ costs ↑ friction ↑ delay
-```
-
-### With PaaS:
-
-```
-Business logic → AI → SPC → Runtime → Output
-                 ↓ faster ↓ cheaper ↓ reusable
-```
-
-**You eliminate the engineering bottleneck** while gaining:
-
-* Deterministic pipelines
-* Portable logic
-* AI-friendly format
-* Fully transparent execution
-
----
-
-## 🔐 Secrets Done Right
-
-The `vault` primitive allows you to handle secrets declaratively:
-
-```yaml
-vault:
-  provider: "hashicorp-vault"
-  secrets: ["API_KEY", "DB_PASS"]
-  rotation_policy:
-    interval_hours: 24
+pandas-as-a-service/
+├── engine/                        # Vault-enabled EDT micro-kernel
+├── studio/                        # Visual canvas editors (React + Tailwind)
+├── examples/                      # Real-world .spc.json templates
+├── docs/                          # Design philosophy and deep dives
+├── pipeline_integration_guide.md # Canvas → Runtime glue logic
+├── setup_package.json             # Vite + React setup
+├── README.md                      # You're reading it!
 ```
 
 ---
@@ -124,108 +104,97 @@ npm run dev
 
 Then open:
 
-* `engine/edt-microkernel.html` (visual kernel runner)
-* `studio/pipeline_canvas_editor.tsx` (canvas UI)
-* or try `reactflow_enhanced_editor.tsx` for fancier visuals
+* `engine/edt-microkernel.html` to run SPC specs
+* `studio/pipeline_canvas_editor.tsx` to build visually
+* `studio/reactflow_enhanced_editor.tsx` for advanced UI
 
 ---
 
-## 💡 Real-World Use Cases
+## 🚪 Core Primitives
 
-| Use Case              | Spec Primitive Example                   |
-| --------------------- | ---------------------------------------- |
-| ✅ Pause Ads           | `monitor → adapter` if CAC > LTV * 3     |
-| ✅ Alert on Anomaly    | `processor → monitor → webhook`          |
-| ✅ ETL Pipelines       | `connector → processor → adapter`        |
-| ✅ Portfolio Rebalance | `aggregator → vault → processor → alert` |
+Each SPC file includes one or more services. Supported primitives:
 
----
+### `connector`
 
-## 🧱 Directory Structure
-
-```
-pandas-as-a-service/
-├── engine/                        # Vault-enabled EDT micro-kernel
-├── studio/                        # Visual canvas editors (React + Tailwind)
-├── examples/                      # Real-world .spc.json templates
-├── docs/                          # Design philosophy and deep dives
-├── pipeline_integration_guide.md # Canvas → Runtime glue logic
-├── setup_package.json             # Vite + React setup
-├── README.md                      # You're reading it!
+```yaml
+type: connector
+spec:
+  url: "https://api.example.com/data/{{state.userId}}"
+  outputKey: api_response
+  persistent: true
 ```
 
----
+### `processor`
 
-## 🧠 Philosophy
+```yaml
+type: processor
+spec:
+  inputKey: raw_data
+  outputKey: clean_data
+  pipes:
+    - select: "row.status === 'active'"
+    - derive: { age: "2025 - row.birthYear" }
+```
 
-> "Instead of writing pipelines in Pandas, describe them once — and execute them anywhere."
+### `adapter`
 
-* No fragile scripts.
-* No runtime surprises.
-* No engineering bottlenecks.
-* **Own your business logic.**
+```yaml
+type: adapter
+spec:
+  kind: webhook
+  url: "https://hooks.example.com/alert"
+  body:
+    text: "New data processed"
+  idempotency_key: "{{state.alert_id}}"
+```
 
-You don’t rent your data. Why rent your pipelines?
+### `monitor`, `router`, `iterator`, `vault`
 
----
-
-## 🛠️ Built With
-
-* 💚 React 18
-* 🌀 Vite + Tailwind
-* 🧠 JSON + YAML SPC format
-* 🌐 HTML microkernel
-* 🧩 Modular service handlers
-
----
-
-## 🛤️ Roadmap
-
-| Phase               | Status  |
-| ------------------- | ------- |
-| Core Engine         | ✅ Done  |
-| Visual Editor       | ✅ Done  |
-| Vault Secrets       | ✅ Done  |
-| AI Copilot Support  | 🚧 Next |
-| Cloud Save/Share    | 🚧 Next |
-| CLI Runtime         | 🔜 Soon |
-| LangChain Adapter   | 🔜 Soon |
-| Public Template Hub | 🔜 Soon |
+Each have their own minimal schema and lifecycle policies.
 
 ---
 
-## 🧪 Example Spec (ETL Flow)
+## 📅 Lifecycle Management
+
+| Type      | Behavior                 | Modifiers                        |
+| --------- | ------------------------ | -------------------------------- |
+| adapter   | auto-stop after fire     | `hold: true`, `persistent: true` |
+| monitor   | stay running             | `oneShot: true`                  |
+| router    | always running (default) | `persistent: false` to stop      |
+| processor | always running           | `persistent: false`              |
+| connector | always running           | `persistent: false`              |
+| iterator  | stops when done          | `loop: true` to repeat           |
+
+---
+
+## 📉 Use Cases
+
+| Use Case        | Spec Primitive Flow             |
+| --------------- | ------------------------------- |
+| ETL pipeline    | connector → processor → adapter |
+| Alert on spike  | processor → monitor → webhook   |
+| Data sync       | iterator → connector → vault    |
+| Ad optimization | monitor → adapter               |
+
+---
+
+## 🔧 SPC Anatomy
 
 ```json
 {
   "spc_version": "1.0",
+  "meta": { "name": "Demo", "description": "Simple pipeline" },
   "services": {
-    "fetch": {
-      "type": "connector",
-      "spec": {
-        "url": "https://api.example.com/sales",
-        "outputKey": "sales_data"
-      }
-    },
     "clean": {
       "type": "processor",
       "spec": {
-        "inputKey": "sales_data",
+        "inputKey": "sales",
         "pipes": [
           { "select": "row.region === 'US'" },
           { "derive": { "revenue": "row.units * row.price" } }
         ]
-      }
-    },
-    "alert": {
-      "type": "adapter",
-      "spec": {
-        "kind": "webhook",
-        "url": "https://hooks.slack.com/services/...",
-        "body": {
-          "text": "New revenue data processed."
-        }
-      }
+      },
+      "status": "running"
     }
   },
   "state": {}
@@ -234,33 +203,42 @@ You don’t rent your data. Why rent your pipelines?
 
 ---
 
-## 🤝 Contributing
+## 🕵️ Philosophy
 
-Want to build a custom handler? Improve Vault support? Add new templates?
+> "Instead of writing pipelines in Pandas, describe them once — and execute them anywhere."
 
-1. Fork the repo
-2. Create a feature branch
-3. Submit a PR with clear intent and a test file
+* ❌ Fragile scripts
+* ❌ Hidden logic
+* ❌ Black-box orchestration
+
+Replaced with:
+
+* ✅ Deterministic, composable services
+* ✅ Reusable declarative specs
+* ✅ Self-healing, portable logic containers
+
+You don’t rent your data. Why rent your pipelines?
 
 ---
 
-## 📄 License
+## 💚 License
 
-MIT — Use it, fork it, build a business on it.
+MIT — Use freely, fork aggressively, build something wild.
 
 ---
 
-## 🌊 Final Word
+## 🙌 Final Thought
 
-This is more than just a data pipeline tool.
-It’s a **post-code operating system for business logic**.
+**PaaS** isn’t just about doing Pandas in YAML.
 
-Pandas was the spreadsheet for developers.
-**PaaS is the spreadsheet for the AI-native enterprise.**
+It’s about making **data pipelines a first-class unit of logic.**
 
-**Build declaratively. Execute deterministically. Think exponentially.**
+* Declarative
+* Deterministic
+* Portable
+
+Build declaratively. Execute deterministically. Think exponentially.
 
 —
-*Built with 💚 by those who believe logic should be portable.*
+*Brought to you by those who believe logic should be portable.*
 
-```

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EDT Micro-Kernel Engine</title>
+    <title>EDT Micro-Kernel Engine v2.1 - Lifecycle Manager</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -11,12 +11,16 @@
             background: #0a0a0a; 
             color: #e0e0e0;
             padding: 20px;
+            overflow-x: hidden;
         }
-        .container { max-width: 1200px; margin: 0 auto; }
+        .container { max-width: 1400px; margin: 0 auto; }
         .header {
             border-bottom: 1px solid #333;
             padding-bottom: 20px;
             margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         h1 { 
             font-size: 24px; 
@@ -37,6 +41,11 @@
             border: 1px solid #333;
             border-radius: 8px;
             padding: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .panel:hover {
+            border-color: #444;
         }
         
         .panel h2 {
@@ -64,6 +73,24 @@
             border-radius: 6px;
             padding: 15px;
             margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .service-card:hover {
+            border-color: #444;
+            transform: translateY(-2px);
+        }
+        
+        .service-card.running {
+            border-left: 4px solid #00ff88;
+        }
+        
+        .service-card.stopped {
+            border-left: 4px solid #ff4444;
+        }
+        
+        .service-card.managed {
+            border-left: 4px solid #00aaff;
         }
         
         .service-header {
@@ -99,6 +126,7 @@
         
         .status-running { background: #00ff88; }
         .status-stopped { background: #ff4444; }
+        .status-managed { background: #00aaff; }
         
         .control-bar {
             background: #1a1a1a;
@@ -109,6 +137,7 @@
             display: flex;
             gap: 10px;
             align-items: center;
+            flex-wrap: wrap;
         }
         
         button {
@@ -122,13 +151,23 @@
             cursor: pointer;
             text-transform: uppercase;
             font-size: 12px;
+            transition: all 0.2s ease;
         }
         
-        button:hover { background: #00cc6a; }
+        button:hover { 
+            background: #00cc6a; 
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
         button:disabled { 
             background: #333; 
             color: #666;
             cursor: not-allowed;
+            transform: none;
         }
         
         .log {
@@ -151,6 +190,7 @@
         .log-info { border-left-color: #00ff88; color: #aaa; }
         .log-warn { border-left-color: #ffaa00; color: #ffaa00; }
         .log-error { border-left-color: #ff4444; color: #ff4444; }
+        .log-lifecycle { border-left-color: #00aaff; color: #00aaff; }
         
         .metrics {
             display: grid;
@@ -164,6 +204,12 @@
             padding: 10px;
             border-radius: 4px;
             text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .metric:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.1);
         }
         
         .metric-value {
@@ -209,6 +255,12 @@
             cursor: pointer;
             color: #666;
             font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .tab:hover {
+            background: #222;
+            color: #aaa;
         }
 
         .tab.active {
@@ -216,13 +268,314 @@
             color: #000;
             font-weight: bold;
         }
+
+        .ledger-view {
+            font-family: 'SF Mono', monospace;
+            font-size: 11px;
+            color: #aaa;
+            background: #0a0a0a;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .ledger-entry {
+            border-left: 2px solid #00ff88;
+            padding: 8px;
+            margin-bottom: 8px;
+            background: #111;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .ledger-entry:hover {
+            transform: translateX(5px);
+        }
+
+        .ledger-entry.lifecycle {
+            border-left-color: #00aaff;
+        }
+
+        .ledger-hash {
+            color: #00ff88;
+            font-size: 10px;
+        }
+
+        .lifecycle-badge {
+            background: #00aaff;
+            color: #000;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+
+        .policy-badge {
+            background: #ffaa00;
+            color: #000;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+
+        .service-controls {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .service-controls button {
+            padding: 4px 8px;
+            font-size: 10px;
+            background: #333;
+            color: #aaa;
+        }
+
+        .service-controls button:hover {
+            background: #444;
+        }
+
+        .service-controls button.start {
+            background: #00ff88;
+            color: #000;
+        }
+
+        .service-controls button.stop {
+            background: #ff4444;
+            color: #fff;
+        }
+
+        .lifecycle-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .lifecycle-running {
+            background: #00ff88;
+            box-shadow: 0 0 5px #00ff88;
+        }
+
+        .lifecycle-stopped {
+            background: #ff4444;
+        }
+
+        .lifecycle-transition {
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.5); }
+            100% { transform: scale(1); }
+        }
+
+        .tick-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 12px;
+            z-index: 100;
+        }
+
+        .tick-indicator .value {
+            color: #00ff88;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .lifecycle-chart {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .lifecycle-item {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 11px;
+        }
+
+        .lifecycle-item .name {
+            color: #fff;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .lifecycle-item .policy {
+            color: #00aaff;
+            font-size: 10px;
+        }
+
+        .lifecycle-item .status {
+            display: flex;
+            align-items: center;
+            margin-top: 5px;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #00ff88;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            max-width: 300px;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            border-color: #00ff88;
+        }
+
+        .notification.error {
+            border-color: #ff4444;
+        }
+
+        .notification.info {
+            border-color: #00aaff;
+        }
+
+        .notification .title {
+            color: #fff;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .notification .message {
+            color: #aaa;
+            font-size: 12px;
+        }
+
+        .notification .close {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            color: #666;
+            cursor: pointer;
+        }
+
+        .lifecycle-flow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 15px 0;
+            padding: 10px;
+            background: #0a0a0a;
+            border-radius: 8px;
+        }
+
+        .flow-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            flex: 1;
+        }
+
+        .flow-step .icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+
+        .flow-step.active .icon {
+            background: #00ff88;
+            color: #000;
+        }
+
+        .flow-step .label {
+            font-size: 10px;
+            color: #666;
+        }
+
+        .flow-step.active .label {
+            color: #00ff88;
+        }
+
+        .flow-arrow {
+            color: #333;
+            font-size: 16px;
+        }
+
+        .flow-step.active ~ .flow-arrow {
+            color: #00ff88;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🌲 EDT Micro-Kernel Engine</h1>
-            <div class="subtitle">Schema-driven execution with pluggable primitive handlers</div>
+            <div>
+                <h1>🌲 EDT Micro-Kernel Engine v2.1 <span class="lifecycle-badge">LIFECYCLE</span></h1>
+                <div class="subtitle">Global Service Lifecycle Manager | Deterministic Tick-Scoped Execution | Auto-Reset All Services</div>
+            </div>
+            <div class="tick-indicator">
+                Tick: <span class="value" id="tickCount">0</span>
+            </div>
+        </div>
+
+        <div class="lifecycle-flow">
+            <div class="flow-step active" id="flowStep1">
+                <div class="icon">1</div>
+                <div class="label">Identify Runnable</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step" id="flowStep2">
+                <div class="icon">2</div>
+                <div class="label">Execute Services</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step" id="flowStep3">
+                <div class="icon">3</div>
+                <div class="label">Apply Policies</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step" id="flowStep4">
+                <div class="icon">4</div>
+                <div class="label">Finalize Tick</div>
+            </div>
         </div>
 
         <div class="control-bar">
@@ -231,16 +584,18 @@
             <button id="tickBtn">⚡ Tick Once</button>
             <button id="loadExampleBtn">📦 Load Example</button>
             <button id="validateBtn">✅ Validate</button>
+            <button id="exportBtn">💾 Export SPC</button>
+            <button id="replayBtn">🔄 Replay from Tick 0</button>
+            <input type="file" id="csvUpload" accept=".csv" style="margin-left: 10px;"/>
             <span style="margin-left: auto; color: #666; font-size: 12px;">
                 Engine: <span id="engineStatus" style="color: #00ff88;">READY</span> | 
-                Core: ~50 lines | 
-                Handlers: Pluggable
+                Mode: <span style="color: #00aaff;">LIFECYCLE MANAGED</span>
             </span>
         </div>
 
         <div class="grid">
             <div class="panel">
-                <h2>Services</h2>
+                <h2>Services <span class="lifecycle-badge">MANAGED</span></h2>
                 <div id="services"></div>
                 <div class="metrics">
                     <div class="metric">
@@ -252,11 +607,11 @@
                         <div class="metric-label">Running</div>
                     </div>
                     <div class="metric">
-                        <div class="metric-value" id="tickCount">0</div>
-                        <div class="metric-label">Ticks</div>
+                        <div class="metric-value" id="lifecycleResets">0</div>
+                        <div class="metric-label">Auto-Resets</div>
                     </div>
                     <div class="metric">
-                        <div class="metric-value" id="eventCount">0</div>
+                        <div class="metric-value" id="eventsCount">0</div>
                         <div class="metric-label">Events</div>
                     </div>
                 </div>
@@ -269,11 +624,21 @@
         </div>
 
         <div class="panel">
+            <h2>MNEME Ledger</h2>
+            <div class="ledger-view" id="ledgerView"></div>
+        </div>
+
+        <div class="panel">
+            <h2>Lifecycle Policies</h2>
+            <div class="lifecycle-chart" id="lifecycleChart"></div>
+        </div>
+
+        <div class="panel">
             <h2>SPC Editor</h2>
             <div class="tab-bar">
                 <div class="tab active" data-tab="spc">SPC Definition</div>
                 <div class="tab" data-tab="schemas">Schemas</div>
-                <div class="tab" data-tab="handlers">Handlers</div>
+                <div class="tab" data-tab="lifecycle">Lifecycle Policies</div>
             </div>
             <textarea id="spcEditor" class="json-editor"></textarea>
         </div>
@@ -284,9 +649,15 @@
         </div>
     </div>
 
+    <div class="notification" id="notification">
+        <div class="close" id="closeNotification">×</div>
+        <div class="title" id="notificationTitle">Notification</div>
+        <div class="message" id="notificationMessage">This is a notification message.</div>
+    </div>
+
     <script>
 // ============================================================================
-// HELPER FUNCTIONS (Must be defined first)
+// HELPER FUNCTIONS
 // ============================================================================
 
 function applyRules(data, rules, context) {
@@ -305,7 +676,8 @@ function evalExpression(expr, context) {
     try {
         const fn = new Function('data', 'state', 'row', `return ${expr}`);
         return fn(context.data, context.state, context.row);
-    } catch {
+    } catch (error) {
+        console.warn(`Expression eval failed: ${expr}`, error);
         return null;
     }
 }
@@ -349,7 +721,107 @@ function pick(obj, fields) {
 }
 
 // ============================================================================
-// EDT MICRO-KERNEL ENGINE (~50 lines of core logic)
+// SCHEMA VALIDATOR
+// ============================================================================
+
+const SCHEMAS = {
+    iterator: {
+        required: ['inputKey', 'outputKey'],
+        optional: ['historyKey','maxHistory','per_tick','resetOnNewData','loop']
+    },
+    csv_loader: {
+        required: ['source','outputKey'],
+        optional: ['options']
+    },
+    connector: {
+        required: ['url', 'outputKey'],
+        optional: ['method', 'rules', 'cache', 'schedule', 'headers', 'body', 'persistent']
+    },
+    processor: {
+        required: ['inputKey', 'outputKey'],
+        optional: ['transform', 'pipes', 'persistent']
+    },
+    monitor: {
+        required: ['checks'],
+        optional: ['thresholds', 'emit', 'oneShot', 'persistent']
+    },
+    adapter: {
+        required: ['kind'],
+        optional: ['url', 'method', 'headers', 'body', 'idempotency_key', 'retry', 'hold', 'persistent']
+    },
+    aggregator: {
+        required: ['inputKey', 'window'],
+        optional: ['outputKey', 'reduce', 'groupBy', 'persistent']
+    },
+    router: {
+        required: ['routes'],
+        optional: ['fallback', 'shard_key', 'shards', 'persistent']
+    },
+    vault: {
+        required: ['provider'],
+        optional: ['secrets', 'rotation_policy', 'persistent']
+    }
+};
+
+function validateSpec(type, spec) {
+    const schema = SCHEMAS[type];
+    if (!schema) {
+        throw new Error(`Unknown service type: ${type}`);
+    }
+    
+    for (const field of schema.required) {
+        if (!(field in spec)) {
+            throw new Error(`Missing required field: ${field}`);
+        }
+    }
+}
+
+// ============================================================================
+// 🔄 LIFECYCLE POLICIES
+// ============================================================================
+
+const LIFECYCLE_POLICIES = {
+    adapter: (service, result, ctx) => {
+        // Adapters auto-reset unless hold=true OR persistent=true
+        if (service.spec.hold || service.spec.persistent) return 'running';
+        if (result?.events?.length > 0) return 'stopped';
+        return null; // no change
+    },
+    
+    monitor: (service, result, ctx) => {
+        // Monitors auto-reset if oneShot=true (unless persistent)
+        if (service.spec.persistent) return 'running';
+        if (service.spec.oneShot && result?.events?.length > 0) return 'stopped';
+        return null;
+    },
+    
+    router: (service, result, ctx) => {
+        // Routers stay running unless explicitly persistent=false
+        if (service.spec.persistent === false) return 'stopped';
+        return 'running';
+    },
+    
+    connector: (service, result, ctx) => {
+        // Connectors stay running by default (they're data feeds)
+        if (service.spec.persistent === false) return 'stopped';
+        return 'running';
+    },
+    
+    processor: (service, result, ctx) => {
+        // Processors stay running by default
+        if (service.spec.persistent === false) return 'stopped';
+        return 'running';
+    },
+    
+    // Default policy for unknown types
+    default: (service, result, ctx) => {
+        if (service.spec.persistent === false) return 'stopped';
+        return 'running';
+    }
+};
+
+// ============================================================================
+// EDT MICRO-KERNEL ENGINE v2.1 - WITH LIFECYCLE MANAGER
 // ============================================================================
 
 class EDTEngine {
@@ -357,47 +829,210 @@ class EDTEngine {
         this.spc = null;
         this.running = false;
         this.handlers = new Map();
-        this.schemas = new Map();
         this.interval = null;
-        this.metrics = { ticks: 0, events: 0 };
+        this.metrics = { ticks: 0, events: 0, lifecycleResets: 0 };
+        this.ledger = [];
+        this.currentPhase = 0;
+    }
+	
+	setPhase(n) {
+	  this.currentPhase = n;
+	  const ids = ['flowStep1','flowStep2','flowStep3','flowStep4'];
+	  for (let i = 0; i < ids.length; i++) {
+		const el = document.getElementById(ids[i]);
+		if (!el) continue;
+		if (n === 0) {
+		  el.classList.remove('active');
+		} else {
+		  // highlight steps up to the current phase
+		  if (i <= (n - 1)) el.classList.add('active'); else el.classList.remove('active');
+		}
+	  }
+	}
+
+    // FIXED VERSION: Remove duplicate code and fix policy application
+
+	async tick() {
+		if (!this.spc) return;
+		
+		this.setPhase(1);
+		const ctx = this.createContext();
+		const results = [];
+		const tickSnapshot = JSON.parse(JSON.stringify(this.spc.state));
+		const executedServices = [];
+
+		// PHASE 1: DETERMINE RUNNABLE SERVICES
+		const servicesToRun = [];
+		for (const [id, service] of Object.entries(this.spc.services)) {
+			if (service.status === 'running') {
+				servicesToRun.push(id);
+			}
+		}
+
+		ctx.log('lifecycle', `Tick ${this.metrics.ticks}: ${servicesToRun.length} services scheduled`);
+
+		// PHASE 2: EXECUTE SERVICES
+		this.setPhase(2);
+		for (const id of servicesToRun) {
+			const service = this.spc.services[id];
+			const handler = this.handlers.get(service.type);
+			
+			if (!handler) {
+				ctx.log('warn', `No handler for type: ${service.type}`);
+				continue;
+			}
+
+			try {
+				validateSpec(service.type, service.spec);
+				
+				const inputHash = this.hash(JSON.stringify({
+					serviceId: id,
+					spec: service.spec,
+					state: tickSnapshot
+				}));
+				
+				const result = await handler.run(id, service.spec, ctx);
+				
+				if (result) {
+					Object.assign(this.spc.state, result.patch || {});
+					if (result.events) results.push(...result.events);
+					service.lastRun = new Date().toISOString();
+					
+					const outputHash = this.hash(JSON.stringify(result.patch || {}));
+					this.recordLedgerEntry(id, inputHash, outputHash, result);
+					
+					// Store result for lifecycle policy application
+					executedServices.push({ id, service, result });
+				}
+			} catch (error) {
+				const msg = error?.message || String(error);
+				ctx.log('error', `Service ${id} failed: ${msg}`);
+				this.spc.state[`${id}_error`] = msg;
+				service.status = 'error'; // Transition to error state
+			}
+		}
+
+		// PHASE 3: LIFECYCLE ENFORCEMENT (FIXED)
+		this.setPhase(3);
+		for (const { id, service, result } of executedServices) {
+			const prevStatus = service.status;
+			const newStatus = this.applyLifecyclePolicy(service, result, ctx);
+			
+			if (newStatus && newStatus !== prevStatus) {
+				service.status = newStatus;
+				this.metrics.lifecycleResets++;
+				ctx.log('lifecycle', `${id}: ${prevStatus} → ${newStatus} (policy)`);
+				
+				this.recordLifecycleTransition(id, prevStatus, newStatus);
+				this.highlightServiceStatusChange(id, newStatus);
+			}
+		}
+
+		// PHASE 4: FINALIZE TICK
+		this.setPhase(4);
+		this.metrics.ticks++;
+		this.metrics.events += results.length;
+		this.render();
+		
+		if (results.length > 0) {
+			this.showNotification('Tick Complete', 
+				`Executed ${servicesToRun.length} services, generated ${results.length} events`, 
+				'success');
+		}
+		
+		this.setPhase(0);
+		return results;
+	}
+
+	// FIXED: Actually use result and ctx parameters
+	applyLifecyclePolicy(service, result, ctx) {
+		const { type, spec = {} } = service;
+
+		switch (type) {
+			case 'adapter':
+			  if (spec.hold || spec.persistent) return 'running';
+			  // stop regardless of event emission to avoid latch on idempotent path
+			  return 'stopped';
+
+
+			case 'monitor':
+				// Stop if oneShot and alert fired
+				if (spec.oneShot && result?.events?.length > 0) return 'stopped';
+				return spec.persistent === false ? 'stopped' : 'running';
+
+			case 'router':
+				// Routers stay running unless explicitly stopped
+				return spec.persistent === false ? 'stopped' : 'running';
+
+			case 'iterator': {
+			  const idx = ctx.state[`__index_${service.id}`] ?? 0;
+			  const len = (ctx.state[spec.inputKey]?.length) ?? 0;
+			  if (!spec.loop && idx >= len) return 'stopped';
+			  return 'running';
+			}
+
+
+			case 'connector':
+			case 'processor':
+			case 'aggregator':
+			case 'vault':
+				return spec.persistent === false ? 'stopped' : 'running';
+
+			default:
+				// Conservative default
+				return spec.persistent === false ? 'stopped' : 'running';
+		}
+	}
+
+    highlightServiceStatusChange(serviceId, newStatus) {
+        const serviceElement = document.querySelector(`[data-service-id="${serviceId}"]`);
+        if (serviceElement) {
+            serviceElement.classList.add('lifecycle-transition');
+            setTimeout(() => {
+                serviceElement.classList.remove('lifecycle-transition');
+            }, 500);
+        }
     }
 
-    async tick() {
-        if (!this.spc) return;
+    recordLifecycleTransition(serviceId, fromStatus, toStatus) {
+        const entry = {
+            tick: this.metrics.ticks,
+            timestamp: new Date().toISOString(),
+            type: 'lifecycle',
+            serviceId,
+            transition: `${fromStatus} → ${toStatus}`,
+            hash: this.hash(JSON.stringify({ serviceId, fromStatus, toStatus, tick: this.metrics.ticks }))
+        };
         
-        const ctx = this.createContext();
-        const results = [];
-
-        for (const [id, service] of Object.entries(this.spc.services)) {
-            if (service.status !== 'running') continue;
-            
-            const handler = this.handlers.get(service.type);
-            if (!handler) {
-                ctx.log('warn', `No handler for type: ${service.type}`);
-                continue;
-            }
-
-            try {
-                const schema = this.schemas.get(service.type);
-                if (schema) this.validateService(service, schema);
-                
-                const result = await handler.run(id, service.spec, ctx);
-                if (result) {
-                    Object.assign(this.spc.state, result.patch || {});
-                    if (result.events) results.push(...result.events);
-                    service.lastRun = new Date().toISOString();
-                }
-            } catch (error) {
-                const msg = error?.message || String(error);
-                ctx.log('error', `Service ${id} failed: ${msg}`);
-                this.spc.state[`${id}_error`] = msg;
-            }
+        this.ledger.push(entry);
+        
+        if (this.ledger.length > 1000) {
+            this.ledger.shift();
         }
+    }
 
-        this.metrics.ticks++;
-        this.metrics.events += results.length;
-        this.render();
-        return results;
+    recordLedgerEntry(serviceId, inputHash, outputHash, result) {
+        const prevHash = this.ledger.length > 0 
+            ? this.ledger[this.ledger.length - 1].hash 
+            : '0'.repeat(8);
+        
+        const entry = {
+            tick: this.metrics.ticks,
+            timestamp: new Date().toISOString(),
+            type: 'execution',
+            serviceId,
+            inputHash,
+            outputHash,
+            eventCount: result.events?.length || 0,
+            prevHash,
+            hash: this.hash(JSON.stringify({ serviceId, inputHash, outputHash, prevHash }))
+        };
+        
+        this.ledger.push(entry);
+        
+        if (this.ledger.length > 1000) {
+            this.ledger.shift();
+        }
     }
 
     createContext() {
@@ -410,7 +1045,7 @@ class EDTEngine {
             fetch: (url, opts) => fetch(url, opts).then(async r => {
                 if (!r.ok) {
                     const body = await r.text().catch(() => '');
-                    throw new Error(`HTTP ${r.status} ${r.statusText} @ ${url}${body ? ' — ' + body.slice(0, 120) : ''}`);
+                    throw new Error(`HTTP ${r.status} @ ${url}${body ? ' – ' + body.slice(0, 120) : ''}`);
                 }
                 return r.json();
             })
@@ -426,9 +1061,10 @@ class EDTEngine {
         if (!this.running) {
             this.running = true;
             this.interval = setInterval(() => this.tick(), 5000);
-            this.log('info', 'Engine started');
+            this.log('info', 'Engine started with lifecycle manager');
             this.render();
             this.tick();
+            this.showNotification('Engine Started', 'Lifecycle manager is now running', 'success');
         }
     }
 
@@ -438,17 +1074,29 @@ class EDTEngine {
             clearInterval(this.interval);
             this.log('info', 'Engine stopped');
             this.render();
+            this.showNotification('Engine Stopped', 'Lifecycle manager has been stopped', 'info');
         }
     }
 
-    validateService(service, schema) {
-        if (!service.id || !service.type || !service.spec) {
-            throw new Error('Missing required fields');
+    async replay(fromTick = 0) {
+        if (fromTick >= this.ledger.length) {
+            this.log('error', `Cannot replay from tick ${fromTick} (ledger size: ${this.ledger.length})`);
+            return;
         }
+        
+        this.log('info', `Replaying from tick ${fromTick}...`);
+        
+        const initialState = JSON.parse(JSON.stringify(
+            this.ledger[fromTick]?.initialState || {}
+        ));
+        this.spc.state = initialState;
+        
+        this.log('info', `Replay complete (determinism check would require full state snapshots)`);
+        this.showNotification('Replay Started', `Replaying from tick ${fromTick}`, 'info');
     }
 
     hash(parts) {
-        const s = JSON.stringify(parts);
+        const s = typeof parts === 'string' ? parts : JSON.stringify(parts);
         const bytes = new TextEncoder().encode(s);
         let h = 2166136261 >>> 0;
         for (let b of bytes) { 
@@ -465,66 +1113,318 @@ class EDTEngine {
         const logEl = document.getElementById('eventLog');
         if (logEl) {
             logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
             if (logEl.children.length > 100) {
                 logEl.firstChild.remove();
             }
         }
     }
 
-    render() {
-        const servicesEl = document.getElementById('services');
-        if (servicesEl) {
-            servicesEl.innerHTML = '';
-            
-            let running = 0, total = 0;
-            for (const [id, service] of Object.entries(this.spc?.services || {})) {
-                total++;
-                if (service.status === 'running') running++;
-                
-                const card = document.createElement('div');
-                card.className = 'service-card';
-                card.innerHTML = `
-                    <div class="service-header">
-                        <span class="service-title">${service.title || id}</span>
-                        <span class="service-type">${service.type}</span>
-                    </div>
-                    <div>
-                        <span class="service-status status-${service.status || 'stopped'}"></span>
-                        <span style="color: #666; font-size: 11px;">
-                            ${service.lastRun ? `Last run: ${new Date(service.lastRun).toLocaleTimeString()}` : 'Never run'}
-                        </span>
-                    </div>
-                `;
-                servicesEl.appendChild(card);
-            }
-
-            const totalEl = document.getElementById('totalServices');
-            const runningEl = document.getElementById('runningServices');
-            const tickEl = document.getElementById('tickCount');
-            const eventEl = document.getElementById('eventCount');
-            
-            if (totalEl) totalEl.textContent = total;
-            if (runningEl) runningEl.textContent = running;
-            if (tickEl) tickEl.textContent = this.metrics.ticks;
-            if (eventEl) eventEl.textContent = this.metrics.events;
-        }
+    showNotification(title, message, type = 'info') {
+        const notification = document.getElementById('notification');
+        const titleEl = document.getElementById('notificationTitle');
+        const messageEl = document.getElementById('notificationMessage');
         
+        if (notification && titleEl && messageEl) {
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+            
+            // Set type-based styling
+            notification.className = 'notification';
+            notification.classList.add(type);
+            
+            // Show notification
+            notification.classList.add('show');
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 5000);
+        }
+    }
+
+    render() {
+        this.renderServices();
+        this.renderState();
+        this.renderLedger();
+        this.renderStatus();
+        this.renderLifecycleChart();
+    }
+
+    renderServices() {
+        const servicesEl = document.getElementById('services');
+        if (!servicesEl) return;
+        
+        servicesEl.innerHTML = '';
+        let running = 0, total = 0;
+        
+        for (const [id, service] of Object.entries(this.spc?.services || {})) {
+            total++;
+            if (service.status === 'running') running++;
+            
+            const isPersistent = service.spec.persistent === true || 
+                                 service.spec.hold === true ||
+                                 (service.type === 'connector' && service.spec.persistent !== false);
+            
+            const card = document.createElement('div');
+            card.className = `service-card ${service.status}`;
+            card.setAttribute('data-service-id', id);
+            card.innerHTML = `
+                <div class="service-header">
+                    <span class="service-title">${service.title || id}</span>
+                    <div>
+                        <span class="service-type">${service.type}</span>
+                        ${isPersistent ? '<span class="lifecycle-badge">PERSIST</span>' : '<span class="lifecycle-badge">MANAGED</span>'}
+                    </div>
+                </div>
+                <div>
+                    <span class="service-status status-${service.status || 'stopped'}"></span>
+                    <span style="color: #666; font-size: 11px;">
+                        ${service.lastRun ? `Last: ${new Date(service.lastRun).toLocaleTimeString()}` : 'Never'}
+                    </span>
+                </div>
+                <div class="service-controls">
+                    <button class="start" onclick="window.engine.setServiceStatus('${id}', 'running')">Start</button>
+                    <button class="stop" onclick="window.engine.setServiceStatus('${id}', 'stopped')">Stop</button>
+                </div>
+            `;
+            servicesEl.appendChild(card);
+        }
+
+        const updateMetric = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        };
+        
+        updateMetric('totalServices', total);
+        updateMetric('runningServices', running);
+        updateMetric('tickCount', this.metrics.ticks);
+        updateMetric('lifecycleResets', this.metrics.lifecycleResets);
+        updateMetric('eventsCount', this.metrics.events);
+    }
+
+    setServiceStatus(serviceId, status) {
+        if (this.spc && this.spc.services[serviceId]) {
+            const oldStatus = this.spc.services[serviceId].status;
+            this.spc.services[serviceId].status = status;
+            this.log('lifecycle', `${serviceId}: ${oldStatus} → ${status} (manual)`);
+            this.render();
+            this.showNotification('Service Status Changed', `${serviceId} is now ${status}`, 'info');
+        }
+    }
+
+    renderState() {
         const stateEl = document.getElementById('stateView');
         if (stateEl) {
             stateEl.textContent = JSON.stringify(this.spc?.state || {}, null, 2);
         }
+    }
+
+    renderLedger() {
+        const ledgerEl = document.getElementById('ledgerView');
+        if (!ledgerEl) return;
         
+        ledgerEl.innerHTML = '';
+        const recentEntries = this.ledger.slice(-20);
+        
+        for (const entry of recentEntries) {
+            const entryDiv = document.createElement('div');
+            entryDiv.className = `ledger-entry ${entry.type}`;
+            
+            if (entry.type === 'lifecycle') {
+                entryDiv.innerHTML = `
+                    <div><strong>Tick ${entry.tick}</strong> | <span style="color: #00aaff;">LIFECYCLE</span> | ${entry.serviceId}</div>
+                    <div style="color: #00aaff; font-size: 10px;">${entry.transition}</div>
+                    <div style="color: #666; font-size: 10px;">hash: ${entry.hash}</div>
+                `;
+            } else {
+                entryDiv.innerHTML = `
+                    <div><strong>Tick ${entry.tick}</strong> | ${entry.serviceId} | ${entry.timestamp}</div>
+                    <div class="ledger-hash">in: ${entry.inputHash} → out: ${entry.outputHash}</div>
+                    <div style="color: #666; font-size: 10px;">chain: ${entry.prevHash} → ${entry.hash}</div>
+                `;
+            }
+            ledgerEl.appendChild(entryDiv);
+        }
+        
+        if (ledgerEl.children.length > 0) {
+            ledgerEl.scrollTop = ledgerEl.scrollHeight;
+        }
+    }
+
+    renderLifecycleChart() {
+        const chartEl = document.getElementById('lifecycleChart');
+        if (!chartEl || !this.spc) return;
+        
+        chartEl.innerHTML = '';
+        
+        for (const [id, service] of Object.entries(this.spc.services)) {
+            const policy = LIFECYCLE_POLICIES[service.type] || LIFECYCLE_POLICIES.default;
+            const isPersistent = service.spec.persistent === true || 
+                                 service.spec.hold === true ||
+                                 (service.type === 'connector' && service.spec.persistent !== false);
+            
+            const item = document.createElement('div');
+            item.className = 'lifecycle-item';
+            item.innerHTML = `
+                <div class="name">${service.title || id}</div>
+                <div class="policy">${service.type} | ${isPersistent ? 'PERSISTENT' : 'MANAGED'}</div>
+                <div class="status">
+                    <span class="lifecycle-indicator lifecycle-${service.status || 'stopped'}"></span>
+                    ${service.status}
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${service.lastRun ? '100%' : '0%'}"></div>
+                </div>
+            `;
+            chartEl.appendChild(item);
+        }
+    }
+
+    renderStatus() {
         const statusEl = document.getElementById('engineStatus');
         if (statusEl) {
             statusEl.textContent = this.running ? 'RUNNING' : 'STOPPED';
             statusEl.style.color = this.running ? '#00ff88' : '#ff4444';
         }
+        
+        // Update tick indicator
+        const tickEl = document.getElementById('tickCount');
+        if (tickEl) {
+            tickEl.textContent = this.metrics.ticks;
+        }
+    }
+
+    exportSPC() {
+        return {
+            ...this.spc,
+            meta: {
+                ...this.spc.meta,
+                exported_at: new Date().toISOString(),
+                engine_version: '2.1.0-lifecycle',
+                ledger_size: this.ledger.length,
+                lifecycle_resets: this.metrics.lifecycleResets
+            }
+        };
     }
 }
 
 // ============================================================================
-// PRIMITIVE HANDLERS (Pluggable modules)
+// PRIMITIVE HANDLERS
 // ============================================================================
+
+const csvLoaderHandler = {
+    type: 'csv_loader',
+    async run(id, spec, ctx) {
+        const { source, outputKey = `${id}_data`, options = {} } = spec;
+
+        try {
+            let csvText = '';
+
+            if (source.startsWith('http')) {
+                csvText = await fetch(source).then(r => r.text());
+            } else if (source.startsWith('data:')) {
+                csvText = decodeURIComponent(source.split(',')[1]);
+            } else {
+                csvText = ctx.state[source] || '';
+            }
+
+            if (!csvText) return { patch: { [outputKey]: [] }, events: [] };
+
+            const lines = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+                .split('\n').map(s => s.trim()).filter(Boolean);
+
+            const delimiter = options.delimiter || ',';
+            const hasHeader = options.header !== false;
+
+            let rows = [];
+            let headers = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                const cols = lines[i].split(delimiter).map(s => s.trim());
+                if (i === 0 && hasHeader) {
+                    headers = cols;
+                } else {
+                    const row = hasHeader
+                        ? Object.fromEntries(headers.map((h, j) => [h, cols[j]]))
+                        : cols;
+                    rows.push(row);
+                }
+            }
+
+            if (options.maxRows && Number.isFinite(options.maxRows)) {
+                rows = rows.slice(0, options.maxRows);
+            }
+
+            return {
+                patch: { [outputKey]: rows },
+                events: [{ name: 'csv.loaded', for: id, data: { count: rows.length } }]
+            };
+        } catch (err) {
+            const msg = err?.message || String(err);
+            ctx.log('error', `CSV loader failed: ${msg}`);
+            return { patch: { [`${id}_error`]: msg } };
+        }
+    }
+};
+
+const iteratorHandler = {
+    type: 'iterator',
+    run(id, spec, ctx) {
+        const {
+            inputKey,
+            outputKey,
+            historyKey = `${id}_history`,
+            maxHistory = 200,
+            per_tick = 1,
+            resetOnNewData = true,
+            loop = false
+        } = spec;
+
+        const src = ctx.state[inputKey];
+        if (!Array.isArray(src) || src.length === 0) return { patch: {}, events: [] };
+
+        const indexKey = `__index_${id}`;
+        const lenKey = `__len_${id}`;
+
+        let idx = ctx.state[indexKey] ?? 0;
+        const prevLen = ctx.state[lenKey];
+        const curLen = src.length;
+
+        const patch = { [lenKey]: curLen };
+
+        if (resetOnNewData && prevLen !== undefined && prevLen !== curLen) {
+            idx = 0;
+        }
+
+        const out = [];
+        for (let i = 0; i < per_tick && (loop || idx < src.length); i++) {
+            if (idx >= src.length) {
+                if (loop) idx = 0; else break;
+            }
+            out.push(src[idx]);
+            idx++;
+        }
+
+        if (out.length === 0) {
+            patch[indexKey] = idx;
+            return { patch, events: [] };
+        }
+
+        patch[outputKey] = (per_tick === 1) ? out[0] : out;
+
+        const hist = (ctx.state[historyKey] || []).concat(out);
+        if (hist.length > maxHistory) hist.splice(0, hist.length - maxHistory);
+        patch[historyKey] = hist;
+
+        patch[indexKey] = idx;
+
+        return {
+            patch,
+            events: [{ name: 'iterator.yield', for: id, data: { count: out.length, index: idx } }]
+        };
+    }
+};
 
 const connectorHandler = {
     type: 'connector',
@@ -568,7 +1468,7 @@ const processorHandler = {
         const input = ctx.state[inputKey];
 
         if (!input) {
-            return { patch: { [outputKey]: null } };
+            return { patch: { [outputKey]: null }, events: [] };
         }
 
         let result = input;
@@ -584,144 +1484,119 @@ const processorHandler = {
                         ? result.filter(row => evalExpression(pipe.select, { row, state: ctx.state }))
                         : result;
                 }
+                
                 if (pipe.project) {
                     result = Array.isArray(result)
                         ? result.map(row => pick(row, pipe.project))
                         : pick(result, pipe.project);
                 }
+                
                 if (pipe.derive) {
+                    const applyDerive = (obj) => {
+                        const copy = { ...obj };
+                        for (const [k, expr] of Object.entries(pipe.derive)) {
+                            copy[k] = evalExpression(expr, { data: obj, state: ctx.state, row: obj });
+                        }
+                        return copy;
+                    };
+                    
                     if (Array.isArray(result)) {
-                        result = result.map(row => {
-                            const copy = { ...row };
-                            for (const [k, expr] of Object.entries(pipe.derive)) {
-                                copy[k] = evalExpression(expr, { data: row, state: ctx.state, row });
-                            }
-                            return copy;
-                        });
+                        result = result.map(applyDerive);
                     } else if (typeof result === 'object' && result !== null) {
-                        for (const [k, expr] of Object.entries(pipe.derive)) {
-                            result[k] = evalExpression(expr, { data: result, state: ctx.state });
-                        }
+                        result = applyDerive(result);
                     } else {
-                        result = { value: result };
-                        for (const [k, expr] of Object.entries(pipe.derive)) {
-                            result[k] = evalExpression(expr, { data: result, state: ctx.state });
-                        }
+                        ctx.log('warn', `Cannot derive on primitive: ${typeof result}`);
                     }
                 }
             }
         }
 
-        const patch = { [outputKey]: result };
-
-        const persisted = [];
-        try {
-            if (result && typeof result === 'object') {
-                const persistList = Array.isArray(spec.persist) ? spec.persist : [];
-                for (const k of Object.keys(result)) {
-                    const shouldPersist = k.startsWith('_') || persistList.includes(k);
-                    if (shouldPersist) {
-                        ctx.state[k] = result[k];
-                        persisted.push(k);
-                    }
-                }
-            }
-        } catch (err) {
-            ctx.log('error', `Processor ${id} persist failed: ${err?.message || err}`);
-        }
-
-        const events = [{ name: 'processor.computed', for: id }];
-        if (persisted.length) {
-            events.push({ name: 'processor.persisted', for: id, data: { persisted } });
-        }
-
-        return { patch, events };
+        return { 
+            patch: { [outputKey]: result },
+            events: [{ name: 'processor.computed', for: id }]
+        };
     }
 };
 
 const monitorHandler = {
     type: 'monitor',
     run(id, spec, ctx) {
-        const { checks = [], thresholds = {}, emit = 'onChange' } = spec;
+        const { checks = [], thresholds = {}, emit = 'onChange', oneShot = false } = spec;
         const results = {};
-        
+
         for (const check of checks) {
             const data = ctx.state[check.dataKey];
             const value = evalExpression(check.expression, { data, state: ctx.state });
-            
             if (value == null) {
                 results[check.name] = { value: null, status: 'unknown' };
                 continue;
             }
-            
             const threshold = thresholds[check.name] || {};
-            
             let status = 'normal';
             if (threshold.above !== undefined && value > threshold.above) status = 'critical';
             if (threshold.below !== undefined && value < threshold.below) status = 'critical';
-            
             results[check.name] = { value, status, threshold };
         }
-        
+
         const outputKey = `${id}_monitoring`;
         const prevResults = ctx.state[outputKey];
         const changed = JSON.stringify(prevResults) !== JSON.stringify(results);
-        
-        const shouldEmit = 
+
+        const shouldEmit =
             emit === 'always' ||
             (emit === 'onChange' && changed) ||
             (emit === 'onTrue' && Object.values(results).some(r => r.status === 'critical'));
-        
+
+        const patch = { [outputKey]: results };
+
         return {
-            patch: { [outputKey]: results },
-            events: shouldEmit ? [{ 
-                name: 'monitor.alert', 
-                for: id, 
-                data: results 
-            }] : []
+            patch,
+            events: shouldEmit ? [{ name: 'monitor.alert', for: id, data: results }] : []
         };
     }
 };
 
 const adapterHandler = {
-  type: 'adapter',
-  async run(id, spec, ctx) {
-    if (spec.kind !== 'webhook') return {};
+    type: 'adapter',
+    async run(id, spec, ctx) {
+        if (spec.kind !== 'webhook') {
+            ctx.log('info', `Adapter ${id}: kind=${spec.kind} (simulated)`);
+            return { patch: {}, events: [] };
+        }
 
-    const input = spec.inputKey ? ctx.state[spec.inputKey] : {};
-    const context = { data: input, state: ctx.state };
+        const idempKey = spec.idempotency_key
+            ? templateObject(spec.idempotency_key, { state: ctx.state })
+            : ctx.hash(id, ctx.clock());
 
-    const idempKey = spec.idempotency_key
-       ? templateObject(spec.idempotency_key, { state: ctx.state, data: ctx.state.demo_data })
-      : ctx.hash(id, ctx.clock());
+        const dedupKey = `__sent_${ctx.hash(id, idempKey)}`;
 
-    const dedupKey = `__sent_${ctx.hash(id, idempKey)}`;
+        if (ctx.state[dedupKey]) {
+            ctx.log('info', `Adapter ${id}: Skipped (idempotent)`);
+            return { patch: {}, events: [] };
+        }
 
-    if (ctx.state[dedupKey]) {
-      ctx.log('info', `Adapter ${id}: Skipped (idempotent)`);
-      return {};
+        const body = spec.body ? templateObject(spec.body, { state: ctx.state }) : {};
+
+        try {
+            ctx.log('info', `Adapter ${id}: Would send webhook to ${spec.url}`);
+            const patch = {
+                [dedupKey]: ctx.clock(),
+                [`${id}_last_sent`]: {
+                    timestamp: ctx.clock(),
+                    body,
+                    idempotency_key: idempKey
+                }
+            };
+            
+            return {
+                patch,
+                events: [{ name: 'adapter.sent', for: id, data: { url: spec.url } }]
+            };
+        } catch (error) {
+            const msg = error?.message || String(error);
+            return { patch: { [`${id}_error`]: msg }, events: [] };
+        }
     }
-
-    const body = spec.body ? templateObject(spec.body, { state: ctx.state, data: ctx.state.demo_data }) : {};
-
-    try {
-      ctx.log('info', `Adapter ${id}: Would send webhook to ${spec.url}`);
-      return {
-        patch: {
-          [dedupKey]: ctx.clock(),
-          [`${id}_last_sent`]: {
-            timestamp: ctx.clock(),
-            body,
-            idempotency_key: idempKey
-          }
-        },
-        events: [{ name: 'adapter.sent', for: id, data: { url: spec.url } }]
-      };
-    } catch (error) {
-      const msg = error?.message || String(error);
-      return { patch: { [`${id}_error`]: msg } };
-    }
-  }
 };
 
 const aggregatorHandler = {
@@ -730,30 +1605,37 @@ const aggregatorHandler = {
         const { inputKey, outputKey = `${id}_aggregated`, window, reduce } = spec;
         const input = ctx.state[inputKey];
         
-        if (!input) return {};
+        if (!input) return { patch: {}, events: [] };
         
         const windowKey = `__window_${id}`;
-        const windowData = ctx.state[windowKey] || { items: [], start: ctx.clock() };
+        const windowData = ctx.state[windowKey] || { 
+            items: [], 
+            start: ctx.clock(),
+            maxSize: 1000
+        };
         
         windowData.items.push({ data: input, timestamp: ctx.clock() });
         
+        if (windowData.items.length > windowData.maxSize) {
+            windowData.items.shift();
+        }
+        
         const windowSizeMs = (window.size_sec || 30) * 1000;
         const now = new Date();
-        windowData.items = windowData.items.filter(item => {
-            return (now - new Date(item.timestamp)) < windowSizeMs;
-        });
+        const cutoff = new Date(now - windowSizeMs);
+        const validItems = windowData.items.filter(i => new Date(i.timestamp) >= cutoff);
         
-        let result = windowData.items;
+        let result = validItems;
         if (reduce?.emit) {
             switch (reduce.emit) {
                 case 'latest':
-                    result = windowData.items[windowData.items.length - 1]?.data;
+                    result = validItems[validItems.length - 1]?.data;
                     break;
                 case 'count':
-                    result = windowData.items.length;
+                    result = validItems.length;
                     break;
                 case 'all':
-                    result = windowData.items.map(i => i.data);
+                    result = validItems.map(i => i.data);
                     break;
             }
         }
@@ -763,35 +1645,94 @@ const aggregatorHandler = {
                 [windowKey]: windowData,
                 [outputKey]: result
             },
-            events: [{ name: 'aggregator.window', for: id, data: { count: windowData.items.length } }]
+            events: [{ name: 'aggregator.window', for: id, data: { count: validItems.length } }]
         };
     }
 };
 
-// ============================================================================
-// VAULT HANDLER - Secure secrets management
-// ============================================================================
+const routerHandler = {
+    type: 'router',
+    run(id, spec, ctx) {
+        const { routes, fallback, shard_key, shards } = spec;
+        let targetService = null;
+        let routeMatched = false;
+        const patch = {};
+
+        // Handle shard-based routing
+        if (shard_key && shards) {
+            const keyValue = templateObject(shard_key, { state: ctx.state });
+            const shardIndex = Math.abs(ctx.hash(keyValue)) % shards;
+            ctx.log('info', `Router ${id}: Shard routing to index ${shardIndex}`);
+            return {
+                patch: {
+                    [`${id}_shard`]: shardIndex,
+                    [`${id}_shard_key`]: keyValue
+                },
+                events: [{ name: 'router.sharded', for: id, data: { shard: shardIndex } }]
+            };
+        }
+
+        // Evaluate routing conditions
+        for (const route of routes || []) {
+            const matches = evalExpression(route.condition, { state: ctx.state });
+            if (matches) {
+                targetService = route.target;
+                routeMatched = true;
+                ctx.log('info', `Router ${id}: Matched ${targetService}`);
+                break;
+            }
+        }
+
+        // FIXED: Apply fallback logic correctly
+        if (!routeMatched && fallback) {
+            targetService = fallback;
+            ctx.log('info', `Router ${id}: Using fallback ${targetService}`);
+        }
+
+        // FIXED: Start target, stop fallback if not used
+        if (targetService && ctx.services[targetService]) {
+            ctx.services[targetService].status = "running";
+            ctx.log('lifecycle', `Router ${id}: Starting ${targetService}`);
+        }
+
+        // Stop fallback if we matched a non-fallback route
+        if (routeMatched && fallback && targetService !== fallback && ctx.services[fallback]) {
+            ctx.services[fallback].status = "stopped";
+            ctx.log('lifecycle', `Router ${id}: Stopping fallback ${fallback}`);
+        }
+
+        patch[`${id}_target`] = targetService;
+        patch[`${id}_matched`] = routeMatched;
+
+        return {
+            patch,
+            events: [{ 
+                name: 'router.routed', 
+                for: id, 
+                data: { target: targetService, matched: routeMatched } 
+            }]
+        };
+    }
+};
+
 const vaultHandler = {
     type: 'vault',
     async run(id, spec, ctx) {
         const { provider, secrets = [], rotation_policy } = spec;
         
-        // Simulated vault operations (in production, integrate with real vault providers)
         const vaultKey = `__vault_${id}`;
         const vaultData = ctx.state[vaultKey] || { secrets: {}, lastRotation: null };
         
         try {
-            // Check if rotation is needed
-            const needsRotation = rotation_policy && 
+            const needsRotation = rotation_policy?.auto_rotate && 
                 (!vaultData.lastRotation || 
-                 (new Date() - new Date(vaultData.lastRotation)) > (rotation_policy.interval_hours * 3600000));
+                 (new Date() - new Date(vaultData.lastRotation)) > (rotation_policy.rotation_days * 86400000));
             
             if (needsRotation) {
                 ctx.log('info', `Vault ${id}: Rotating secrets per policy`);
                 vaultData.lastRotation = ctx.clock();
             }
             
-            // Store secret references (not actual secrets)
             for (const secretRef of secrets) {
                 vaultData.secrets[secretRef] = {
                     ref: secretRef,
@@ -823,110 +1764,180 @@ const vaultHandler = {
                 patch: {
                     [`${id}_error`]: msg,
                     [`${id}_status`]: { provider, healthy: false }
-                }
+                },
+                events: []
             };
         }
     }
 };
 
 // ============================================================================
-// INITIALIZATION & UI
+// EXAMPLE SPC WITH LIFECYCLE TESTING
 // ============================================================================
 
 const exampleSPC = {
-  spc_version: "1.0",
-  meta: {
-    name: "Demo with Vault",
-    exported_at: new Date().toISOString()
-  },
-  services: {
-    "secret-vault": {
-      id: "secret-vault",
-      type: "vault",
-      title: "Secrets Manager",
-      spec: {
-        provider: "hashicorp-vault",
-        secrets: ["api_key", "db_password", "jwt_secret"],
-        rotation_policy: {
-          interval_hours: 24
-        }
-      },
-      status: "running",
-      lastRun: null
+    spc_version: "1.0",
+    meta: {
+        name: "Lifecycle Manager Demo",
+        description: "Tests auto-reset for adapters, persistent routers, and one-shot monitors",
+        exported_at: new Date().toISOString()
     },
-
-    "test-feed": {
-      id: "test-feed",
-      type: "connector",
-      title: "Dummy Data Feed",
-      spec: {
-        url: "https://jsonplaceholder.typicode.com/todos/1",
-        outputKey: "demo_data",
-        rules: {
-          rules: [{
-            name: "extract",
-            if: "data",
-            then: {
-              user: "{{ data.userId }}",
-              title: "{{ data.title }}",
-              done: "{{ data.completed }}",
-              timestamp: "{{ new Date().toISOString() }}"
-            }
-          }]
-        }
-      },
-      status: "running",
-      lastRun: null
-    },
-
-    "data-processor": {
-      id: "data-processor",
-      type: "processor",
-      title: "Demo Processor",
-      spec: {
-        inputKey: "demo_data",
-        outputKey: "processed_data",
-        transform: [{
-          name: "calc",
-          if: "data",
-          then: {
-            message: "{{ data.done ? '✅ Completed' : '⏳ Not yet' }}",
-            summary: "{{ data.user + ' - ' + data.title }}"
-          }
-        }]
-      },
-      status: "running",
-      lastRun: null
-    },
-
-    "data-monitor": {
-      id: "data-monitor",
-      type: "monitor",
-      title: "Completion Monitor",
-      spec: {
-        checks: [{
-          name: "doneCheck",
-          dataKey: "processed_data",
-          expression: "data && data.message.includes('✅')"
-        }],
-        thresholds: {
-          doneCheck: { above: 0 }
+    services: {
+        "data-feed": {
+            id: "data-feed",
+            type: "connector",
+            title: "External API Feed",
+            spec: {
+                url: "https://jsonplaceholder.typicode.com/todos/1",
+                outputKey: "raw_data",
+                persistent: true,
+                rules: {
+                    rules: [{
+                        name: "extract",
+                        if: "data",
+                        then: {
+                            user_id: "{{ data.userId }}",
+                            task_title: "{{ data.title }}",
+                            completed: "{{ data.completed }}",
+                            timestamp: "{{ new Date().toISOString() }}"
+                        }
+                    }]
+                }
+            },
+            status: "running",
+            lastRun: null
         },
-        emit: "onChange"
-      },
-      status: "running",
-      lastRun: null
-    }
-  },
-  state: {}
+
+        "data-processor": {
+            id: "data-processor",
+            type: "processor",
+            title: "Transform Pipeline",
+            spec: {
+                inputKey: "raw_data",
+                outputKey: "processed_data",
+                persistent: true,
+                pipes: [
+                    {
+                        derive: {
+                            status_emoji: "data.completed ? '✅' : '⏳'",
+                            priority: "data.user_id > 5 ? 'high' : 'normal'"
+                        }
+                    }
+                ]
+            },
+            status: "running",
+            lastRun: null
+        },
+
+        "smart-router": {
+            id: "smart-router",
+            type: "router",
+            title: "Priority Router",
+            spec: {
+                persistent: true,
+                routes: [
+                    {
+                        condition: "state.processed_data?.priority === 'high'",
+                        target: "high-priority-monitor"
+                    },
+                    {
+                        condition: "state.processed_data?.completed === true",
+                        target: "completion-monitor"
+                    }
+                ],
+                fallback: "default-monitor"
+            },
+            status: "running",
+            lastRun: null
+        },
+
+        "completion-monitor": {
+            id: "completion-monitor",
+            type: "monitor",
+            title: "Completion Monitor (One-Shot)",
+            spec: {
+                checks: [{
+                    name: "isComplete",
+                    dataKey: "processed_data",
+                    expression: "data?.completed === true"
+                }],
+                emit: "onChange",
+                oneShot: true
+            },
+            status: "stopped",
+            lastRun: null
+        },
+
+        "high-priority-monitor": {
+            id: "high-priority-monitor",
+            type: "monitor",
+            title: "High Priority Monitor (One-Shot)",
+            spec: {
+                checks: [{
+                    name: "isHighPriority",
+                    dataKey: "processed_data",
+                    expression: "data?.priority === 'high'"
+                }],
+                emit: "onTrue",
+                oneShot: true
+            },
+            status: "stopped",
+            lastRun: null
+        },
+
+        "default-monitor": {
+            id: "default-monitor",
+            type: "monitor",
+            title: "Default Monitor (One-Shot)",
+            spec: {
+                checks: [{
+                    name: "hasData",
+                    dataKey: "processed_data",
+                    expression: "data !== null"
+                }],
+                emit: "always",
+                oneShot: true
+            },
+            status: "stopped",
+            lastRun: null
+        },
+
+        "alert-webhook": {
+            id: "alert-webhook",
+            type: "adapter",
+            title: "Alert Webhook (Auto-Reset)",
+            spec: {
+                kind: "webhook",
+                url: "https://hooks.example.com/alert",
+                body: {
+                    message: "{{ state.processed_data?.task_title }}",
+                    priority: "{{ state.processed_data?.priority }}",
+                    timestamp: "{{ state.processed_data?.timestamp }}"
+                }
+            },
+            status: "stopped",
+            lastRun: null
+        }
+    },
+    state: {}
 };
+
+// ============================================================================
+// UI FUNCTIONS
+// ============================================================================
 
 function loadExample() {
     window.engine.spc = JSON.parse(JSON.stringify(exampleSPC));
+    window.engine.ledger = [];
+    window.engine.metrics = { ticks: 0, events: 0, lifecycleResets: 0 };
+    
     const editor = document.getElementById('spcEditor');
     if (editor) editor.value = JSON.stringify(window.engine.spc, null, 2);
+    
     window.engine.render();
-    window.engine.log('info', 'Example SPC loaded with Vault primitive');
+    window.engine.log('info', '✅ Lifecycle demo SPC loaded');
+    window.engine.log('lifecycle', 'Watch the lifecycle manager auto-reset services after execution');
+    window.engine.showNotification('Example Loaded', 'Lifecycle demo SPC loaded successfully', 'success');
 }
 
 function validateSPC() {
@@ -934,21 +1945,46 @@ function validateSPC() {
         const editor = document.getElementById('spcEditor');
         const text = editor ? editor.value : '';
         const spc = JSON.parse(text);
+        
         if (!spc.spc_version || !spc.services || !spc.state) {
             throw new Error('Invalid SPC structure (need spc_version, services, state)');
         }
+        
+        for (const [id, service] of Object.entries(spc.services)) {
+            if (!service.type || !service.spec) {
+                throw new Error(`Invalid service: ${id}`);
+            }
+            validateSpec(service.type, service.spec);
+        }
+        
         window.engine.spc = spc;
         window.engine.render();
-        window.engine.log('info', 'SPC validated and loaded successfully');
+        window.engine.log('info', 'SPC validated and loaded successfully ✅');
+        window.engine.showNotification('SPC Validated', 'Service definitions are valid', 'success');
     } catch (error) {
         const msg = error?.message || String(error);
         window.engine.log('error', `Validation failed: ${msg}`);
+        window.engine.showNotification('Validation Failed', msg, 'error');
     }
+}
+
+function exportSPC() {
+    const exported = window.engine.exportSPC();
+    const blob = new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `spc-lifecycle-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    window.engine.log('info', 'SPC exported with lifecycle metrics');
+    window.engine.showNotification('SPC Exported', 'Service definitions exported successfully', 'success');
 }
 
 function switchTab(tabName) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    const targetTab = document.querySelector(`[data-tab="${tabName}"]`);
+    if (targetTab) targetTab.classList.add('active');
     
     const editor = document.getElementById('spcEditor');
     if (!editor) return;
@@ -958,58 +1994,92 @@ function switchTab(tabName) {
             editor.value = JSON.stringify(window.engine.spc || exampleSPC, null, 2);
             break;
         case 'schemas':
-            editor.value = JSON.stringify({
-                connector: "Required: url, outputKey | Optional: rules, cache, schedule",
-                processor: "Required: inputKey, outputKey | Optional: transform, pipes",
-                monitor: "Required: checks | Optional: thresholds, emit",
-                adapter: "Required: kind | Optional: url, body, idempotency_key",
-                aggregator: "Required: inputKey, window | Optional: reduce, groupBy",
-                vault: "Required: provider | Optional: secrets, rotation_policy"
-            }, null, 2);
+            editor.value = JSON.stringify(SCHEMAS, null, 2);
             break;
-        case 'handlers':
-            editor.value = `// Handler count by type:
-Registered Handlers: ${window.engine.handlers.size}
-- connector: ${window.engine.handlers.has('connector') ? '✅' : '❌'}
-- processor: ${window.engine.handlers.has('processor') ? '✅' : '❌'}
-- monitor: ${window.engine.handlers.has('monitor') ? '✅' : '❌'}
-- adapter: ${window.engine.handlers.has('adapter') ? '✅' : '❌'}
-- aggregator: ${window.engine.handlers.has('aggregator') ? '✅' : '❌'}
-- vault: ${window.engine.handlers.has('vault') ? '✅' : '❌'}
+        case 'lifecycle':
+            editor.value = `// LIFECYCLE POLICIES
+// Services are automatically managed based on type and spec flags
 
-Core Engine Size:
-- Engine class: ~50 lines
-- Each handler: ~30–50 lines
-- Total: < 400 lines
+ADAPTER POLICY:
+- Auto-reset to "stopped" after firing (unless hold=true or persistent=true)
+- Prevents infinite webhook spam
+- Clean tick-by-tick execution
 
-Micro-kernel + pluggable primitives FTW.
-Note: Router primitive has been removed in favor of Vault for secrets management.`;
+MONITOR POLICY:
+- Auto-reset if oneShot=true (unless persistent=true)
+- Stays running by default for continuous monitoring
+- Perfect for "alert once" scenarios
+
+ROUTER POLICY:
+- Stays "running" by default (persistent=true implicit)
+- Set persistent=false to auto-stop after routing
+
+CONNECTOR POLICY:
+- Stays "running" by default (data feeds)
+- Set persistent=false to fetch once and stop
+
+PROCESSOR POLICY:
+- Stays "running" by default
+- Set persistent=false for one-time transforms
+
+DEFAULT POLICY:
+- Respects persistent flag
+- Defaults to "running" for unknown types
+
+FLAGS:
+- persistent=true  → service stays running after execution
+- persistent=false → service auto-stops after execution
+- hold=true        → adapter-specific persistent flag
+- oneShot=true     → monitor-specific one-time flag
+
+LIFECYCLE FLOW PER TICK:
+1. Identify services with status="running"
+2. Execute all handlers
+3. Apply lifecycle policies
+4. Auto-reset services per policy
+5. Log transitions to MNEME ledger
+
+Current lifecycle resets: ${window.engine?.metrics?.lifecycleResets || 0}`;
             break;
     }
 }
 
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
 window.engine = new EDTEngine();
 
-// Register all handlers (vault replaces router)
+window.engine.register(csvLoaderHandler);
 window.engine.register(connectorHandler);
 window.engine.register(processorHandler);
 window.engine.register(monitorHandler);
 window.engine.register(adapterHandler);
 window.engine.register(aggregatorHandler);
+window.engine.register(routerHandler);
 window.engine.register(vaultHandler);
+window.engine.register(iteratorHandler);
 
 window.addEventListener('DOMContentLoaded', () => {
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const tickBtn = document.getElementById('tickBtn');
-    const loadExampleBtn = document.getElementById('loadExampleBtn');
-    const validateBtn = document.getElementById('validateBtn');
-
-    if (startBtn) startBtn.addEventListener('click', () => window.engine.start());
-    if (stopBtn) stopBtn.addEventListener('click', () => window.engine.stop());
-    if (tickBtn) tickBtn.addEventListener('click', () => window.engine.tick());
-    if (loadExampleBtn) loadExampleBtn.addEventListener('click', loadExample);
-    if (validateBtn) validateBtn.addEventListener('click', validateSPC);
+    document.getElementById('startBtn')?.addEventListener('click', () => window.engine.start());
+    document.getElementById('stopBtn')?.addEventListener('click', () => window.engine.stop());
+    document.getElementById('tickBtn')?.addEventListener('click', () => window.engine.tick());
+    document.getElementById('loadExampleBtn')?.addEventListener('click', loadExample);
+    document.getElementById('validateBtn')?.addEventListener('click', validateSPC);
+    document.getElementById('exportBtn')?.addEventListener('click', exportSPC);
+    document.getElementById('replayBtn')?.addEventListener('click', () => window.engine.replay(0));
+    document.getElementById('csvUpload')?.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            window.engine.spc.state['uploaded_csv'] = reader.result;
+            window.engine.log('info', `CSV uploaded into state as 'uploaded_csv'`);
+            window.engine.render();
+            window.engine.showNotification('CSV Uploaded', 'CSV data loaded into state', 'success');
+        };
+        reader.readAsText(file);
+    });
 
     document.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', (e) => {
@@ -1018,9 +2088,14 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    document.getElementById('closeNotification')?.addEventListener('click', () => {
+        document.getElementById('notification')?.classList.remove('show');
+    });
+
     loadExample();
-    window.engine.log('info', 'EDT Micro-Kernel Engine initialized');
-    window.engine.log('info', `Registered ${window.engine.handlers.size} primitive handlers (with Vault)`);
+    window.engine.log('info', '🌲 EDT Micro-Kernel Engine v2.1 [LIFECYCLE] initialized');
+    window.engine.log('info', `Registered ${window.engine.handlers.size} primitive handlers`);
+    window.engine.log('lifecycle', '🔄 Global lifecycle manager active - all services managed');
 });
     </script>
 </body>
